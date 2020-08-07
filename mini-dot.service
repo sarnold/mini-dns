@@ -3,8 +3,9 @@ Description=TCP DNS Forwarder
 After=network.target
 
 [Service]
+EnvironmentFile=-/etc/default/mini-dot
 Type=simple
-ExecStart=/usr/local/share/tcp-forwarder/forwarder.py 127.0.0.1 10.0.0.220
+ExecStart=/usr/bin/forwarder.py --tls 127.0.0.1 $DOT_PROVIDER
 Restart=on-failure
 
 [Install]
