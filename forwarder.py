@@ -17,8 +17,8 @@
 
 Please read the README. Usage:
 
-    forwarder.py {--tls} <loopback-address> <dns-server-address> &
-    
+    forwarder.py {--notls} <loopback-address> <dns-server-address> &
+
 The above will run the script in the background. dns-server-address should be one of your
 configured local caching resolvers (I don't recommend 8.8.8.8).
 
@@ -38,7 +38,7 @@ class UDPListener(asyncio.DatagramProtocol):
     def connection_made(self, transport):
         self.transport = transport
         return
-    
+
     async def handle_request(self, request, addr):
         reader, writer = await asyncio.open_connection(self.remote_address, self.ssl and 853 or 53, ssl=self.ssl)
         # NOTE: When using TCP the request and response are prepended with
@@ -57,13 +57,13 @@ class UDPListener(asyncio.DatagramProtocol):
 
 def main():
     try:
-        tls = sys.argv[1] == '--tls'
-        if tls:
+        no_tls = sys.argv[1] == '--notls'
+        if no_tls:
             listen_address, remote_address = sys.argv[2:4]
         else:
             listen_address, remote_address = sys.argv[1:3]
     except:
-        print('Usage: forwarder.py {--tls} <udp-listen-address> <remote-server-address>', file=sys.stderr)
+        print('Usage: forwarder.py {--notls} <udp-listen-address> <remote-server-address>', file=sys.stderr)
         sys.exit(1)
     event_loop = asyncio.get_event_loop()
     listener = event_loop.create_datagram_endpoint(UDPListener, local_addr=(listen_address, 53))
@@ -75,10 +75,10 @@ def main():
     except OSError as e:
         print('{} (did you supply a loopback address?)'.format(e), file=sys.stderr)
         sys.exit(1)
-        
+
     service.remote_address = remote_address
     service.event_loop = event_loop
-    if tls:
+    if not no_tls:
         service.ssl = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
     else:
         service.ssl = None
