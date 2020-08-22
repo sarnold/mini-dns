@@ -8,5 +8,6 @@ pidfile="/run/${RC_SVCNAME}.pid"
 command_background=true
 
 depend() {
-	need net
+	provide dns
+	need localmount net
 }
