@@ -1,5 +1,8 @@
 # /etc/default/mini-dot: config file for systemd service
 
+# local listen address
+UDP_LISTENER=127.0.0.1
+
 # upstream DoT provider; feel free to lookup more:
 # https://github.com/DNSCrypt/dnscrypt-resolvers/blob/master/v3/public-resolvers.md
 #  
