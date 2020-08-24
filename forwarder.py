@@ -46,12 +46,16 @@ import logging.handlers
 
 from daemon import Daemon
 
+try:
+    from node_tools.helper_funcs import get_runtimedir
+    pid_file = os.path.join(get_runtimedir(), 'forwarder.pid')
+except:
+    if os.getuid() == 0:
+        pid_file = os.path.join('/run', 'forwarder.pid')
+    else:
+        import tempfile
+        pid_file = os.path.join(tempfile.gettempdir(), 'forwarder.pid')
 
-if os.getuid() == 0:
-    pid_file = os.path.join('/run', 'forwarder.pid')
-else:
-    import tempfile
-    pid_file = os.path.join(tempfile.gettempdir(), 'forwarder.pid')
 
 logger = logging.getLogger(__name__)
 

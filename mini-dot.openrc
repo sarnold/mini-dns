@@ -5,7 +5,7 @@
 description="fpnd - FreePN network daemon"
 command="/usr/bin/forwarder.py"
 command_args="${START_OPTS}"
-pidfile="/run/forwarder.pid"
+pidfile="/run/${RC_SVCNAME}.pid"
 
 
 depend() {
