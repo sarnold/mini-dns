@@ -50,9 +50,10 @@ Please leave your experiences and thoughts in the feedback issue.
 I assume that you're running a local caching resolver, and not using `8.8.8.8`. I don't know how that will work, I haven't
 tried it and I'm not likely to. If you're worried about _privacy_ then DoT/H should be your go-to (I recommend DoT).
 
-This requires `python3`. If `python3` lives in `/usr/bin/` then yay! Otherwise:
+NOTE: This is the daemonized version, so TLS is always enabled and usage is slightly different:
 
-    python3 ./forwarder.py {--tls} 127.0.0.1 <one-of-your-actual-resolvers> &
+    ./forwarder.py start <udp-listen-address> <dns-server-address> [<listen_port>]
+    ./forwarder.py stop|status
 
 Once you've done that, edit your network settings and make one of the nameservers `127.0.0.1`. You don't have to remove
 the other nameserver entries unless you've reached the working limit (typically three). It should work with IP6 too,

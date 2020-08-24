@@ -1,4 +1,7 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# Target:   Python 3.6
+#
 # Copyright (c) 2020 by Fred Morris Tacoma WA
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,24 +18,59 @@
 
 """TCP-only DNS Forwarder.
 
-Please read the README. Usage:
+Please read the README. Daemon usage:
 
-    forwarder.py {--notls} <loopback-address> <dns-server-address> &
+    forwarder.py start <udp-listen-address> <dns-server-address> [<listen_port>]
+    forwarder.py stop|status
 
-The above will run the script in the background. dns-server-address should be one of your
-configured local caching resolvers (I don't recommend 8.8.8.8).
+The above will run the script in the background. dns-server-address
+should be one of your configured local caching resolvers or a "trusted"
+provider of DNS over TLS.
 
-After running the script edit your network settings and change your resolver to loopback-address.
+After running the script edit your network settings and change your
+resolver to udp-listen-address and the default port 5353.  Use the
+optional last arg above to set a different listen port (eg, you can
+use port 53 with the proper permissions).
 
-loopback-address will typically be 127.0.0.1 for IP4 or ::1 for IP6.
+udp-listen-address will typically be 127.0.0.1 for IP4 or ::1 for IP6.
 
-Specifying "--tls" establishes the connection with TLS, contacting the server on
-port 853. (Also known as "DoT".)
+The Daemon version always establishes the connection with TLS, contacting
+the server on port 853. (Also known as "DoT".)
 """
-
+import os
 import sys
 import asyncio
 import ssl
+import logging
+import logging.handlers
+
+from daemon import Daemon
+
+try:
+    from node_tools.helper_funcs import get_runtimedir
+    pid_file = os.path.join(get_runtimedir(), 'forwarder.pid')
+except:
+    if os.getuid() == 0:
+        pid_file = os.path.join('/run', 'forwarder.pid')
+    else:
+        import tempfile
+        pid_file = os.path.join(tempfile.gettempdir(), 'forwarder.pid')
+
+
+logger = logging.getLogger(__name__)
+
+# set log level and handler/formatter
+logger.setLevel(logging.DEBUG)
+logging.getLogger('node_tools.helper_funcs').level = logging.DEBUG
+
+handler = logging.handlers.SysLogHandler(address='/dev/log', facility='daemon')
+formatter = logging.Formatter('%(module)s: %(funcName)s+%(lineno)s: %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
+stdout = '/tmp/forwarder.log'
+stderr = '/tmp/forwarder_err.log'
+
 
 class UDPListener(asyncio.DatagramProtocol):
     def connection_made(self, transport):
@@ -52,44 +90,66 @@ class UDPListener(asyncio.DatagramProtocol):
         return
 
     def datagram_received(self, request, addr):
-        self.event_loop.create_task(self.handle_request(request,addr))
+        self.event_loop.create_task(self.handle_request(request, addr))
         return
 
-def main():
-    try:
-        no_tls = sys.argv[1] == '--notls'
-        if no_tls:
-            listen_address, remote_address = sys.argv[2:4]
-        else:
-            listen_address, remote_address = sys.argv[1:3]
-    except:
-        print('Usage: forwarder.py {--notls} <udp-listen-address> <remote-server-address>', file=sys.stderr)
-        sys.exit(1)
-    event_loop = asyncio.get_event_loop()
-    listener = event_loop.create_datagram_endpoint(UDPListener, local_addr=(listen_address, 53))
-    try:
-        transport, service = event_loop.run_until_complete(listener)
-    except PermissionError:
-        print('Permission Denied! (are you root?)', file=sys.stderr)
-        sys.exit(1)
-    except OSError as e:
-        print('{} (did you supply a loopback address?)'.format(e), file=sys.stderr)
-        sys.exit(1)
 
-    service.remote_address = remote_address
-    service.event_loop = event_loop
-    if not no_tls:
-        service.ssl = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-    else:
-        service.ssl = None
+class dnsDaemon(Daemon):
+    def cleanup(self):
+        transport.close()
+        event_loop.close()
 
-    try:
+    def run(self):
         event_loop.run_forever()
-    except KeyboardInterrupt:
-        pass
 
-    transport.close()
-    event_loop.close()
 
 if __name__ == "__main__":
-    main()
+
+    listen_port = 5353
+    if len(sys.argv) == 5:
+        listen_port = sys.argv[4]
+    if 'start' == sys.argv[1]:
+        print('Using listen port: {}'.format(listen_port))
+
+    if len(sys.argv) >= 4 and 'start' == sys.argv[1]:
+        try:
+            listen_address, remote_address = sys.argv[2:4]
+        except Exception as exc:
+            logger.warning('Argument error is {}'.format(exc))
+
+        event_loop = asyncio.get_event_loop()
+        listener = event_loop.create_datagram_endpoint(UDPListener, local_addr=(listen_address, listen_port))
+
+        try:
+            transport, service = event_loop.run_until_complete(listener)
+        except PermissionError as exc:
+            logger.error('error opening listen port {}'.format(listen_port))
+            logger.error('exception was {}'.format(exc))
+            print('Port error: {}'.format(exc))
+            sys.exit(1)
+
+        service.remote_address = remote_address
+        service.event_loop = event_loop
+        service.ssl = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+
+    daemon = dnsDaemon(pid_file, verbose=1, use_cleanup=True)
+    if sys.argv[1] not in ('start', 'stop', 'status'):
+        print("Unknown command")
+        sys.exit(2)
+    if len(sys.argv) == 4 or len(sys.argv) == 5:
+        if 'start' == sys.argv[1]:
+            logger.info('Starting')
+            daemon.start()
+        sys.exit(0)
+    elif len(sys.argv) == 2:
+        if 'stop' == sys.argv[1]:
+            logger.info('Stopping')
+            daemon.stop()
+        elif 'status' == sys.argv[1]:
+            res = daemon.status()
+            logger.info('Status is {}'.format(res))
+        sys.exit(0)
+    else:
+        print("Usage: {} start <udp-listen-address> <remote-server-address>".format(sys.argv[0]))
+        print("       {} stop|status".format(sys.argv[0]))
+        sys.exit(2)

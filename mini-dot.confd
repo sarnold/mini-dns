@@ -1,10 +1,10 @@
 # /etc/conf.d/mini-dot: config file for /etc/init.d/mini-dot
 
-# enable this if you really need to disable tls
-#NO_TLS="--notls"
-
 # local dns listen address
 UDP_LISTENER="127.0.0.1"
+
+# default is 5353
+#LISTENER_PORT="53"
 
 # upstream DoT provider; feel free to lookup more:
 # https://github.com/DNSCrypt/dnscrypt-resolvers/blob/master/v3/public-resolvers.md
@@ -15,4 +15,5 @@ UDP_LISTENER="127.0.0.1"
 
 DNS_PROVIDER="45.67.219.208"
 
-START_OPTS="${NO_TLS} ${UDP_LISTENER} ${DNS_PROVIDER}"
+START_OPTS="start ${UDP_LISTENER} ${DNS_PROVIDER}"
+# START_OPTS="start ${UDP_LISTENER} ${DNS_PROVIDER} ${LISTENER_PORT}"
