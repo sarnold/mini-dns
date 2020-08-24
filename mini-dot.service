@@ -4,8 +4,11 @@ After=network.target
 
 [Service]
 EnvironmentFile=-/etc/default/mini-dot
-Type=simple
-ExecStart=/usr/bin/forwarder.py --tls $UDP_LISTENER $DOT_PROVIDER
+ExecStart=/usr/bin/forwarder.py start $UDP_LISTENER $DOT_PROVIDER
+ExecStop=/bin/kill -TERM $MAINPID
+KillMode=none
+Type=forking
+PIDFile=/run/forwarder.pid
 Restart=on-failure
 
 [Install]
